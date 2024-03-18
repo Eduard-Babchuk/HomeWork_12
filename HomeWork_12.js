@@ -44,24 +44,6 @@ async function createTables() {
     }
 }
 
-async function clearTable(tableName) {
-    try {
-        await client.query(`DELETE FROM ${tableName}`)
-        console.log(`>> Data cleared from '${tableName}' table successfully.`)
-    } catch (error) {
-        console.error(">> Error clearing data from table:", error)
-    }
-}
-
-async function resetSequence(tableName) {
-    try {
-        await client.query(`ALTER SEQUENCE ${tableName}_id_seq RESTART WITH 1`)
-        console.log(`>> Sequence reset for '${tableName}' table successfully.`)
-    } catch (error) {
-        console.error(">> Error resetting sequence:", error)
-    }
-}
-
 async function importData(filePath, tableName) {
     try {
         const data = fs.readFileSync(filePath, 'utf8')
@@ -97,24 +79,32 @@ async function displayData(tableName) {
 
 async function main() {
     await createTables()
+    const tables = ['days_of_week', 'lesson_hours', 'subjects']
 
-    await clearTable('days_of_week')
-    await clearTable('lesson_hours')
-    await clearTable('subjects')
+    for (const table of tables) {
+        const hasDataInTable = await hasData(table)
 
-    await resetSequence('days_of_week')
-    await resetSequence('lesson_hours')
-    await resetSequence('subjects')
-
-    await importData('./data/days_of_week.json', 'days_of_week')
-    await importData('./data/lesson_hours.json', 'lesson_hours')
-    await importData('./data/subjects.json', 'subjects')
-
-    await displayData('days_of_week')
-    await displayData('lesson_hours')
-    await displayData('subjects')
-
+        switch (true) {
+            case hasDataInTable:
+                console.log(`>> Data already exists in '${table}' table:`)
+                await displayData(table)
+                break
+            default:
+                await importData(`./data/${table}.json`, table)
+                break
+        }
+    }
     await client.end()
+}
+
+async function hasData(tableName) {
+    try {
+        const result = await client.query(`SELECT EXISTS (SELECT 1 FROM ${tableName})`)
+        return result.rows[0].exists
+    } catch (error) {
+        console.error(">> Error checking data:", error)
+        return false
+    }
 }
 
 main()
